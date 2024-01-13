@@ -1,41 +1,59 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import sys
-import MeCab
-import re
-import jaconv
+import typing
 import unicodedata
 
-
-def is_kanji(ch):
-    return 'CJK UNIFIED IDEOGRAPH' in unicodedata.name(ch)
-
-
-def is_hiragana(ch):
-    return 'HIRAGANA' in unicodedata.name(ch)
+import fugashi
+import jaconv
+import unidic
 
 
-def split_okurigana_reverse(text, hiragana):
-    """ 
-      tested:
-        お茶(おちゃ)
-        ご無沙汰(ごぶさた)
-        お子(こ)さん
+def get_html(text: str) -> str:
+    html = ""
+    for chars, furigana in _split_furigana(text):
+        if furigana:
+            html = f"{html}<ruby><rb>{chars}</rb><rt>{furigana}</rt></ruby>"
+        else:
+            html = f"{html}{chars}"
+    return html
+
+
+# TODO: Accept arguments to allow printing plaintext
+def get_plaintext(text: str) -> str:
+    plaintext = ""
+    for chars, furigana in _split_furigana(text):
+        if furigana:
+            plaintext = f"{plaintext}{chars}({furigana})"
+        else:
+            plaintext = f"{plaintext}{chars}"
+    return plaintext
+
+
+def _split_okurigana_reverse(
+    text: str, hiragana: str
+) -> typing.Iterator[tuple[str, str | None]]:
     """
-    yield (text[0],)
-    yield from split_okurigana(text[1:], hiragana[1:])
-
-
-def split_okurigana(text, hiragana):
-    """ 送り仮名 processing
-      tested: 
-         * 出会(であ)う
-         * 明(あか)るい
-         * 駆(か)け抜(ぬ)け
+    tested:
+      お茶(おちゃ)
+      ご無沙汰(ごぶさた)
+      お子(こ)さん
     """
-    if is_hiragana(text[0]):
-        yield from split_okurigana_reverse(text, hiragana)
-    if all(is_kanji(_) for _ in text):
+    yield text[0], None
+    yield from _split_okurigana(text[1:], hiragana[1:])
+
+
+def _split_okurigana(
+    text: str, hiragana: str
+) -> typing.Iterator[tuple[str, str | None]]:
+    """送り仮名 processing
+    tested:
+       * 出会(であ)う
+       * 明(あか)るい
+       * 駆(か)け抜(ぬ)け
+    """
+    if _is_hiragana(text[0]):
+        yield from _split_okurigana_reverse(text, hiragana)
+    if all(_is_kanji(_) for _ in text):
         yield text, hiragana
         return
     text = list(text)
@@ -45,27 +63,27 @@ def split_okurigana(text, hiragana):
             if hira == char:
                 text.pop(0)
                 if ret[0]:
-                    if is_kanji(ret[0]):
-                        yield ret[0], ''.join(ret[1][:-1])
-                        yield (ret[1][-1],)
+                    if _is_kanji(ret[0]):
+                        yield ret[0], "".join(ret[1][:-1])
+                        yield ret[1][-1], None
                     else:
-                        yield (ret[0],)
+                        yield ret[0], None
                 else:
-                    yield (hira,)
-                ret = ('', [])
+                    yield hira, None
+                ret = ("", [])
                 if text and text[0] == hira:
                     text.pop(0)
                 break
             else:
-                if is_kanji(char):
+                if _is_kanji(char):
                     if ret[1] and hira == ret[1][-1]:
                         text.pop(0)
-                        yield ret[0], ''.join(ret[1][:-1])
+                        yield ret[0], "".join(ret[1][:-1])
                         yield char, hira
-                        ret = ('', [])
+                        ret = ("", [])
                         text.pop(0)
                     else:
-                        ret = (char, ret[1]+[hira])
+                        ret = (char, ret[1] + [hira])
                 else:
                     # char is also hiragana
                     if hira != char:
@@ -74,62 +92,31 @@ def split_okurigana(text, hiragana):
                         break
 
 
-def split_furigana(text):
-    """ MeCab has a problem if used inside a generator ( use yield instead of return  )
-    The error message is:
-    ```
-    SystemError: <built-in function delete_Tagger> returned a result with an error set
-    ```
-    It seems like MeCab has bug in releasing resource
+def _split_furigana(text: str) -> typing.Iterator[tuple[str, str | None]]:
     """
-    mecab = MeCab.Tagger("-Ochasen")
-    mecab.parse('') # 空でパースする必要がある
-    node = mecab.parseToNode(text)
-    ret = []
+    Split the text into tuples of kanji/furigana
+    """
+    tagger = fugashi.Tagger(f"-d {unidic.DICDIR}")
+    node_list = tagger.parseToNodeList(text)
 
-    while node is not None:
-        origin = node.surface # もとの単語を代入
-        if not origin:
-            node = node.next
+    for node in node_list:
+        if not node.surface:
             continue
 
-        # originが空のとき、漢字以外の時はふりがなを振る必要がないのでそのまま出力する
-        if origin != "" and any(is_kanji(_) for _ in origin):
-            #sometimes MeCab can't give kanji reading, and make node-feature have less than 7 when splitted.
-            #bypass it and give kanji as isto avoid IndexError
-            if len(node.feature.split(",")) > 7:
-                kana = node.feature.split(",")[7] # 読み仮名を代入
-            else:
-                kana = node.surface
-            hiragana = jaconv.kata2hira(kana)
-            for pair in split_okurigana(origin, hiragana):
-                ret += [pair]
+        if node.feature.kana and any(_is_kanji(_) for _ in node.surface):
+            hiragana = jaconv.kata2hira(node.feature.kana)
+            for pair in _split_okurigana(node.surface, hiragana):
+                yield pair
         else:
-            if origin:
-                ret += [(origin,)]
-        node = node.next
-    return ret
+            yield node.surface, None
 
 
-def print_html(text):
-    for pair in split_furigana(text):
-        if len(pair)==2:
-            kanji,hira = pair
-            print("<ruby><rb>{0}</rb><rt>{1}</rt></ruby>".
-                    format(kanji, hira), end='')
-        else:
-            print(pair[0], end='')
-    print('')
+def _is_kanji(ch: str) -> bool:
+    return "CJK UNIFIED IDEOGRAPH" in unicodedata.name(ch)
 
 
-def print_plaintext(text):
-    for pair in split_furigana(text):
-        if len(pair)==2:
-            kanji,hira = pair
-            print("%s(%s)" % (kanja,hira), end='')
-        else:
-            print(pair[0], end='')
-    print('')
+def _is_hiragana(ch: str) -> bool:
+    return "HIRAGANA" in unicodedata.name(ch)
 
 
 def main():
@@ -137,6 +124,5 @@ def main():
     print_html(text)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
