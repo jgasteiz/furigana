@@ -1,50 +1,53 @@
 # furigana
-Generate furigana(振り仮名) from Japanese
 
-It uses [MeCab](http://taku910.github.io/mecab/) (a Natural Language Toolkit) to split Japanese into words, and superscript it with furigana (振り仮名).
+Generate furigana(振り仮名) for Japanese text.
 
-## Example:
-### input
-```
-from furigana.furigana import print_html
-print_html('澱んだ街角で僕らは出会った')
-```
-### output
-<ruby><rb>澱</rb><rt>よど</rt></ruby>
-ん
-だ
-<ruby><rb>街角</rb><rt>まちかど</rt></ruby>
-で
-<ruby><rb>僕</rb><rt>ぼく</rt></ruby>
-ら
-は
-<ruby><rb>出</rb><rt>で</rt></ruby>
-<ruby><rb>会</rb><rt>あ</rt></ruby>
-っ
-た
+It uses [Fugashi](https://github.com/polm/fugashi),
+a [MeCab](https://taku910.github.io/mecab/) wrapper,
+to split Japanese into words, and superscript it with furigana (振り仮名).
 
-### input
-```
-from furigana.furigana import print_html
-print_html('お茶にお煎餅、よく合いますね')
-```
-
-### output
-お
-<ruby><rb>茶</rb><rt>ちゃ</rt></ruby>
-に
-お
-<ruby><rb>煎餅</rb><rt>せんべい</rt></ruby>
-、
-よく
-<ruby><rb>合</rb><rt>あ</rt></ruby>
-い
-ます
-ね
+This repository is forked from [MikimotoH/furigana](https://github.com/MikimotoH/furigana).
 
 ## Usage
+
+From python:
+```python
+import furigana
+
+furigana.get_html("食べる")
+'<ruby><rb>食</rb><rt>た</rt></ruby>べる'
+
+furigana.get_plaintext('澱んだ街角で僕らは出会った')
+'澱(よど)んだ街角(まちかど)で僕(ぼく)らは出(で)会(あ)った'
+
+furigana.get_plaintext_for_anki('澱んだ街角で僕らは出会った')
+'澱[よど]んだ街角[まちかど]で僕[ぼく]らは出[で]会[あ]った'
 ```
-$ python3 furigana.py '活版印刷の流れを汲む出版作業では'
+
+From command line:
+
+```shell
+python -m furigana 食べる
+<ruby><rb>食</rb><rt>た</rt></ruby>べる
+
+python -m furigana 食べる -f plaintext
+食(た)べる
+
+python -m furigana 食べる -f anki
+食[た]べる
+
+python -m furigana 食べる -h
+ usage: Furigana [-h] [-f {html,plaintext,anki}] text
+ 
+ Adds furigana to the given Japanese text
+ 
+ positional arguments:
+   text
+ 
+ options:
+   -h, --help            show this help message and exit
+   -f {html,plaintext,anki}, --format {html,plaintext,anki}
+                         Output format
 ```
 
 # Dependency

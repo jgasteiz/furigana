@@ -3,4 +3,4 @@ setup.cfg
 setup.py
 furigana/__init__.py
 furigana/__main__.py
-furigana/furigana.py
+furigana/_furigana.py
