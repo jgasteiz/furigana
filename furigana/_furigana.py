@@ -135,31 +135,3 @@ def _get_tagger() -> fugashi.Tagger:
     if _tagger is None:
         _tagger = fugashi.Tagger(f"-d {unidic.DICDIR}")
     return _tagger
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog="Furigana",
-        description="Adds furigana to the given Japanese text",
-    )
-    parser.add_argument("text")
-    parser.add_argument(
-        "-f",
-        "--format",
-        help="Output format",
-        default="html",
-        dest="format",
-        choices=["html", "plaintext", "anki"],
-    )
-    args = parser.parse_args()
-
-    if args.format == "html":
-        output = get_html(args.text)
-    elif args.format == "plaintext":
-        output = get_plaintext(args.text)
-    elif args.format == "anki":
-        output = get_plaintext_for_anki(args.text)
-    else:
-        raise ValueError(f"Unknown format: {args.format}")
-
-    print(output)
