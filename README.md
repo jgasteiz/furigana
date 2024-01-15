@@ -1,3 +1,5 @@
+![Test Status](https://github.com/jgasteiz/furigana/actions/workflows/python-package.yml/badge.svg)
+
 # furigana
 
 Generate furigana(振り仮名) for Japanese text.
