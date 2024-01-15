@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys
+import argparse
 import typing
 import unicodedata
 
@@ -18,12 +18,21 @@ def get_html(text: str) -> str:
     return html
 
 
-# TODO: Accept arguments to allow printing plaintext
 def get_plaintext(text: str) -> str:
     plaintext = ""
     for chars, furigana in _split_furigana(text):
         if furigana:
             plaintext = f"{plaintext}{chars}({furigana})"
+        else:
+            plaintext = f"{plaintext}{chars}"
+    return plaintext
+
+
+def get_plaintext_for_anki(text: str) -> str:
+    plaintext = ""
+    for chars, furigana in _split_furigana(text):
+        if furigana:
+            plaintext = f"{plaintext}{chars}[{furigana}]"
         else:
             plaintext = f"{plaintext}{chars}"
     return plaintext
@@ -96,8 +105,7 @@ def _split_furigana(text: str) -> typing.Iterator[tuple[str, str | None]]:
     """
     Split the text into tuples of kanji/furigana
     """
-    tagger = fugashi.Tagger(f"-d {unidic.DICDIR}")
-    node_list = tagger.parseToNodeList(text)
+    node_list = _get_tagger().parseToNodeList(text)
 
     for node in node_list:
         if not node.surface:
@@ -119,10 +127,39 @@ def _is_hiragana(ch: str) -> bool:
     return "HIRAGANA" in unicodedata.name(ch)
 
 
-def main():
-    text = sys.argv[1]
-    print_html(text)
+_tagger: fugashi.Tagger | None = None
+
+
+def _get_tagger() -> fugashi.Tagger:
+    global _tagger
+    if _tagger is None:
+        _tagger = fugashi.Tagger(f"-d {unidic.DICDIR}")
+    return _tagger
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        prog="Furigana",
+        description="Adds furigana to the given Japanese text",
+    )
+    parser.add_argument("text")
+    parser.add_argument(
+        "-f",
+        "--format",
+        help="Output format",
+        default="html",
+        dest="format",
+        choices=["html", "plaintext", "anki"],
+    )
+    args = parser.parse_args()
+
+    if args.format == "html":
+        output = get_html(args.text)
+    elif args.format == "plaintext":
+        output = get_plaintext(args.text)
+    elif args.format == "anki":
+        output = get_plaintext_for_anki(args.text)
+    else:
+        raise ValueError(f"Unknown format: {args.format}")
+
+    print(output)
