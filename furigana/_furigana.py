@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import argparse
 import typing
 import unicodedata
 
@@ -38,6 +37,12 @@ def get_plaintext_for_anki(text: str) -> str:
     return plaintext
 
 
+class _UnableToSplitOkurigana(Exception):
+    """
+    Exception raised when something bad happens trying to split an okurigana.
+    """
+
+
 def _split_okurigana_reverse(
     text: str, hiragana: str
 ) -> typing.Iterator[tuple[str, str | None]]:
@@ -60,6 +65,7 @@ def _split_okurigana(
        * 明(あか)るい
        * 駆(か)け抜(ぬ)け
     """
+    original_text_ = text
     if _is_hiragana(text[0]):
         yield from _split_okurigana_reverse(text, hiragana)
     if all(_is_kanji(_) for _ in text):
@@ -90,7 +96,10 @@ def _split_okurigana(
                         yield ret[0], "".join(ret[1][:-1])
                         yield char, hira
                         ret = ("", [])
-                        text.pop(0)
+                        try:
+                            text.pop(0)
+                        except IndexError:
+                            raise _UnableToSplitOkurigana(original_text_)
                     else:
                         ret = (char, ret[1] + [hira])
                 else:
@@ -113,8 +122,17 @@ def _split_furigana(text: str) -> typing.Iterator[tuple[str, str | None]]:
 
         if node.feature.kana and any(_is_kanji(_) for _ in node.surface):
             hiragana = jaconv.kata2hira(node.feature.kana)
-            for pair in _split_okurigana(node.surface, hiragana):
-                yield pair
+
+            # If something fails while trying to split the okurigana,
+            # return the node and its hiragana as-is.
+            node_split = []
+            try:
+                for pair in _split_okurigana(node.surface, hiragana):
+                    node_split.append(pair)
+            except _UnableToSplitOkurigana:
+                yield node.surface, hiragana
+            else:
+                yield from node_split
         else:
             yield node.surface, None
 
