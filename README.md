@@ -1,12 +1,18 @@
 # furigana
-Generate furigana(振り仮名) from Japanese
 
-It uses [MeCab](http://taku910.github.io/mecab/) (a Natural Language Toolkit) to split Japanese into words, and superscript it with furigana (振り仮名).
+Generate furigana(振り仮名) for Japanese text.
+
+It uses [Fugashi](https://github.com/polm/fugashi),
+a [MeCab](https://taku910.github.io/mecab/) wrapper,
+to split Japanese into words, and superscript it with furigana (振り仮名).
+
+This repository is forked from [MikimotoH/furigana](https://github.com/MikimotoH/furigana).
 
 ## Example:
+
 ### input
 ```
-from furigana.furigana import print_html
+import furigana import print_html
 print_html('澱んだ街角で僕らは出会った')
 ```
 ### output
